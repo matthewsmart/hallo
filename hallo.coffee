@@ -250,7 +250,7 @@
 
         _prepareToolbar: ->
             that = @
-            @toolbar_class = options.toolbarClass
+            @toolbar_class = @options.toolbarClass
             @toolbar = jQuery("<div class=\"hallotoolbar #{@toolbar_class}\"></div>").hide()
             @toolbar.css "position", "absolute"
             @toolbar.css "top", @element.offset().top - 20
