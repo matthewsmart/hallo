@@ -7,46 +7,35 @@
             editable: null
             toolbar: null
             uuid: ""
-            formattings: 
+            formattings:
                 bold: true
                 italic: true
                 strikeThrough: true
                 underline: true
 
         _create: ->
-            widget = this
-            buttonset = jQuery "<span class=\"#{widget.widgetName}\"></span>"
-            buttonize = (format) =>
-                label = format.substr(0, 1).toUpperCase()
-                id = "#{@options.uuid}-#{format}"
-                buttonset.append jQuery("<input id=\"#{id}\" type=\"checkbox\" /><label for=\"#{id}\" class=\"#{format}_button\">#{label}</label>").button()
-                button = jQuery "##{id}", buttonset
-                button.attr "hallo-command", format
-                button.addClass format
-                button.bind "change", (event) ->
-                    format = jQuery(this).attr "hallo-command"
-                    widget.options.editable.execute format
+          @buttonset = $("<span class=\"#{@widgetName}\"></span>")
+            
+          for format, enabled of @options.formattings
+            @_createButton(format) if enabled
 
-                queryState = (event) ->
-                    if document.queryCommandState format
-                        button.attr "checked", true
-                        button.next("label").addClass "ui-state-clicked"
-                        button.button "refresh"
-                    else
-                        button.attr "checked", false
-                        button.next("label").removeClass "ui-state-clicked"
-                        button.button "refresh"
-
-                element = @element
-                @element.bind "halloenabled", ->
-                    element.bind "keyup paste change mouseup", queryState
-                @element.bind "hallodisabled", ->
-                    element.unbind "keyup paste change mouseup", queryState
-            buttonize format for format, enabled of @options.formattings when enabled
-
-            buttonset.buttonset()
-            @options.toolbar.append buttonset
+          @buttonset.buttonset()
+          @options.toolbar.append @buttonset
 
         _init: ->
+
+        _createButton: (format) ->
+          label = format.substr(0, 1).toUpperCase()
+          id = "#{@options.uuid}-#{format}"
+          @buttonset.append $("<input id=\"#{id}\" type=\"button\" value=\"#{label}\"/>").button()
+          button = $("##{id}", @buttonset)
+          button.data "hallo-command", format
+          button.on "click", (e) =>
+            console.log e
+            command = $(e.currentTarget).data "hallo-command"
+            @options.editable.execute command
+            e.preventDefault()
+            return false
+
 
 )(jQuery)
