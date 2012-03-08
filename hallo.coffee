@@ -127,9 +127,14 @@
         @element.on event, this, @options[callback]
 
     _prepareToolbar: ->
-      @toolbar_class = @options.toolbarClass
-      @toolbar = $("<div class=\"#{@toolbar_class}\"><div class=\"handle\" /></div>").hide()
-      $('body').append(@toolbar)
+      @toolbar = $("<div />").addClass(@options.toolbarClass).
+        appendTo('body').
+        hide().
+        draggable().
+        position
+          my: 'center'
+          at: 'right center'
+          of: @element
 
     _classEvents:
       'focus click'       : '_activateEditMode'
@@ -201,7 +206,11 @@
 
     # Only supports one range for now (i.e. no multiselection)
     getSelection: ->
-      rangy.getSelection().getRangeAt(0)
+      selection = rangy.getSelection()
+      if selection.rangeCount > 0
+        return selection.getRangeAt(0)
+      else
+        return null
 
     restoreSelection: (range) ->
       rangy.getSelection().setSingleRange(range)
@@ -238,6 +247,9 @@
 
     # Execute a contentEditable command
     execute: (command, value) ->
+      console.log command
+      console.log value
+
       if document.execCommand command, false, value
         @element.trigger "change"
 
@@ -256,7 +268,7 @@
         e.data.element.blur()
 
     _rangesEqual: (r1, r2) ->
-      r1 and r1.equals(r2)
+      r1 and r2 and r1.equals(r2)
 
     # Check if some text is selected, and if this selection has changed. If it changed,
     # trigger the "halloselected" event
@@ -268,13 +280,12 @@
       # I did not find a better solution than setTimeout in 0 ms
       setTimeout =>
         range = @getSelection()
-        if @_isEmptyRange(range)
-          if @selection
-            @selection = null
-            @_trigger "hallo:unselected", null,
+        if ((range is null) or @_isEmptyRange(range)) and @selection
+          @selection = null
+          @_trigger "hallo:unselected", null,
               editable: this
               originalEvent: event
-        else if @selection or not @_rangesEqual(range, @selection)
+        else if range and !@_rangesEqual(range, @selection)
           @selection = range.cloneRange()
           @_trigger "hallo:selected", null,
             editable: this
@@ -283,7 +294,7 @@
       , 0
 
     _isEmptyRange: (range) ->
-      (range.code is 1) or range.collapsed
+      range.collapsed
 
     _generateUUID: ->
       S4 = ->
