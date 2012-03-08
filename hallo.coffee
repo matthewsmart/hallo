@@ -50,18 +50,18 @@
   # ### Activated
   #
   # When user activates an editable (usually by clicking or tabbing
-  # to an editable element), a `halloactivated` event will be fired.
+  # to an editable element), a `hallo:activated` event will be fired.
   #
-  #     jQuery('p').bind('halloactivated', function() {
+  #     jQuery('p').bind('hallo:activated', function() {
   #         console.log("Activated");
   #     });
   #
   # ### Deactivated
   #
-  # When user gets out of an editable element, a `hallodeactivated`
+  # When user gets out of an editable element, a `hallo:deactivated`
   # event will be fired.
   #
-  #     jQuery('p').bind('hallodeactivated', function() {
+  #     jQuery('p').bind('hallo:deactivated', function() {
   #         console.log("Deactivated");
   #     });
   #
@@ -74,7 +74,7 @@
   #         console.log("New contents are " + data.content);
   #     });
   #
-  jQuery.widget "IKS.hallo",
+  jQuery.widget "IKS.hallo", {
     toolbar: null
     bound: false
     originalContent: ""
@@ -84,30 +84,27 @@
     options:
       editable: true
       plugins: {}
-      floating: true
-      offset: {x:0,y:0}
-      showAlways: false
       activated: ->
       deactivated: ->
-      selected: ->
-      unselected: ->
       enabled: ->
       disabled: ->
+      selected: ->
+      unselected: ->
       placeholder: ''
-      toolbarClass: ''
+      toolbarClass: 'hallo_toolbar'
 
     _create: ->
       @originalContent = @getContents()
       @id = @_generateUUID()
+      @_bindUserCallbacks()
       @_prepareToolbar()
-
       for plugin, options of @options.plugins
-        if not jQuery.isPlainObject options
-          options = {}
+        options = {} unless jQuery.isPlainObject(options)
         options["editable"] = this
         options["toolbar"] = @toolbar
         options["uuid"] = @id
-        jQuery(@element)[plugin] options
+        # Call individual plugins
+        @element[plugin](options)
 
     _init: ->
       if @options.editable
@@ -115,40 +112,92 @@
       else
         @disable()
 
-    # Disable an editable
-    disable: ->
-      @element.attr "contentEditable", false
-      @element.unbind "focus", @_activated
-      @element.unbind "blur", @_deactivated
-      @element.unbind "keyup paste change", @_checkModified
-      @element.unbind "keyup", @_keys
-      @element.unbind "keyup mouseup", @_checkSelection
-      @bound = false
-      @_trigger "disabled", null
+    _userCallbacks:
+      'hallo:activated'   : 'activated'
+      'hallo:deactivated' : 'deactivated'
+      'hallo:enabled'     : 'enabled'
+      'hallo:disabled'    : 'disabled'
+      'hallo:selected'    : 'selected'
+      'hallo:unselected'  : 'unselected'
+
+    _bindUserCallbacks: ->
+      for event, callback of @_userCallbacks
+        @element.on event, this, @options[callback]
+
+    _prepareToolbar: ->
+      @toolbar_class = @options.toolbarClass
+      @toolbar = $("<div class=\"#{@toolbar_class}\"></div>").hide()
+      $('body').append(@toolbar)
+
+    _classEvents:
+      'focus click'       : '_activateEditMode'
+      'blur'              : '_deactivateEditMode'
+      'keyup paste change': '_checkModified'
+      'keyup'             : '_checkEscape'
+      'keyup mouseup'     : '_checkSelection'
 
     # Enable an editable
     enable: ->
+      # Set Editable
       @element.attr "contentEditable", true
-
-      unless @element.html()
-        @element.html this.options.placeholder
-
+      # Manage Placeholder
+      @_insertPlaceholder()
+      # Don't double bind events
       if not @bound
-        @element.bind "focus", this, @_activated
-        # Only add the blur event when showAlways is set to true
-        if not @options.showAlways
-          @element.bind "blur", this, @_deactivated
-        @element.bind "keyup paste change", this, @_checkModified
-        @element.bind "keyup", this, @_keys
-        @element.bind "keyup mouseup", this, @_checkSelection
-        widget = this
+        for event, callback of @_classEvents
+          @element.on event, this, @[callback]
         @bound = true
+      # Show toolbar
+      console.log 'fading in toolbar'
+      @toolbar.fadeIn()
+      # Trigger user event
+      @_trigger 'hallo:enabled'
 
-      @_trigger "enabled", null
+    # Disable an editable
+    disable: ->
+      # Set Editable
+      @element.attr "contentEditable", false
+      # Manage Placeholder
+      @_removePlaceholder()
+      # Unbind events
+      for event, callback of @_classEvents
+        @element.off event, @[callback]
+      @bound = false
+      # Show toolbar
+      @toolbar.fadeOut()
+      # Trigger user event
+      @_trigger "hallo:disabled"
 
-    # Activate an editable for editing
-    activate: ->
-      @element.focus()
+    _activateEditMode: (e) ->
+      console.log e
+      e.data.activateEditMode()
+
+    activateEditMode: ->
+      # Take care of the place holder
+      @_removePlaceholder()
+      # Add the class
+      @element.addClass 'inEditMode'
+      # Trigger the user event
+      @_trigger "hallo:activated"
+
+    _deactivateEditMode: (e) ->
+      e.data.deactivateEditMode()
+
+    deactivateEditMode: () ->
+      # Take care of the place holder
+      @_insertPlaceholder()
+      # Remove the class
+      @element.removeClass 'inEditMode'
+      # Trigger the user event
+      @_trigger "hallo:deactivated"
+
+    _removePlaceholder: ->
+      if @getContents() is @options.placeholder
+        @setContents ''
+
+    _insertPlaceholder: ->
+      if @getContents() is ''
+        @setContents @options.placeholder
 
     # Only supports one range for now (i.e. no multiselection)
     getSelection: ->
@@ -226,18 +275,6 @@
         ((1 + Math.random()) * 0x10000|0).toString(16).substring 1
       "#{S4()}#{S4()}-#{S4()}-#{S4()}-#{S4()}-#{S4()}#{S4()}#{S4()}"
 
-    _getToolbarPosition: (event, selection) ->
-      return unless event
-      if @options.floating
-        if event.originalEvent instanceof KeyboardEvent
-         return @_getCaretPosition(selection);
-        else if event.originalEvent instanceof MouseEvent
-          return { top: event.pageY, left: event.pageX }
-      else
-        offset = parseFloat(@element.css('outline-width')) + parseFloat(@element.css('outline-offset'))
-        top: @element.offset().top - this.toolbar.outerHeight() - offset
-        left: @element.offset().left - offset
-
     _getCaretPosition: (range) ->
       tmpSpan = jQuery "<span/>"
       newRange = document.createRange()
@@ -248,49 +285,6 @@
       tmpSpan.remove()
       return position
 
-    _prepareToolbar: ->
-      that = @
-      @toolbar_class = @options.toolbarClass
-      @toolbar = jQuery("<div class=\"hallotoolbar #{@toolbar_class}\"></div>").hide()
-      if @toolbar_class == '' or @toolbar_class is undefined
-        @toolbar.css "position", "absolute"
-        @toolbar.css "top", @element.offset().top - 20
-        @toolbar.css "left", @element.offset().left
-      jQuery('body').append(@toolbar)
-      @toolbar.bind "mousedown", (event) ->
-      event.preventDefault()
-
-      if @options.showAlways
-        @options.floating = false
-        # catch activate -> show
-        @element.bind "halloactivated", (event, data) ->
-          that._updateToolbarPosition(that._getToolbarPosition(event))
-          that.toolbar.show()
-
-        # catch deactivate -> hide
-        @element.bind "hallodeactivated", (event, data) ->
-          that.toolbar.hide()
-        else
-          # catch select -> show (and reposition?)
-          @element.bind "halloselected", (event, data) ->
-            widget = data.editable
-            position = widget._getToolbarPosition data.originalEvent, data.selection
-            if position
-              that._updateToolbarPosition position
-              that.toolbar.show()
-              # TO CHECK: Am I not showing in some case?
-
-          # catch deselect -> hide
-          @element.bind "hallounselected", (event, data) ->
-            data.editable.toolbar.hide()
-
-        jQuery(window).resize (event) ->
-          that._updateToolbarPosition that._getToolbarPosition(event)
-
-    _updateToolbarPosition: (position) ->
-      if @toolbar_class == '' or @toolbar_class is undefined
-        this.toolbar.css "top", position.top
-        this.toolbar.css "left", position.left
 
     _checkModified: (event) ->
       widget = event.data
@@ -299,11 +293,10 @@
           editable: widget
           content: widget.getContents()
 
-    _keys: (event) ->
-      widget = event.data
-      if event.keyCode == 27
-        widget.restoreOriginalContent()
-        widget.turnOff()
+    _keys: (e) ->
+      if e.keyCode == 27
+        e.data.restoreOriginalContent()
+        e.data.deactivateEditor()
 
     _rangesEqual: (r1, r2) ->
       r1.startContainer is r2.startContainer and r1.startOffset is r2.startOffset and r1.endContainer is r2.endContainer and r1.endOffset is r2.endOffset
@@ -323,14 +316,14 @@
         if widget._isEmptySelection(sel) or widget._isEmptyRange(sel)
           if widget.selection
             widget.selection = null
-            widget._trigger "unselected", null,
+            widget._trigger "hallo:unselected", null,
               editable: widget
               originalEvent: event
           return
 
         if !widget.selection or not widget._rangesEqual sel, widget.selection
           widget.selection = sel.cloneRange()
-          widget._trigger "selected", null,
+          widget._trigger "hallo:selected", null,
             editable: widget
             selection: widget.selection
             ranges: [widget.selection]
@@ -351,40 +344,7 @@
 
       return false
 
-    turnOn: () ->
-      if this.getContents() is this.options.placeholder
-        this.setContents ''
-
-      jQuery(@element).addClass 'inEditMode'
-      #make sure the toolbar has not got the full width of the editable element when floating is set to true
-      if !@options.floating
-        el = jQuery(@element)
-        widthToAdd = parseFloat el.css('padding-left')
-        widthToAdd += parseFloat el.css('padding-right')
-        widthToAdd += parseFloat el.css('border-left-width')
-        widthToAdd += parseFloat el.css('border-right-width')
-        widthToAdd += (parseFloat el.css('outline-width')) * 2
-        widthToAdd += (parseFloat el.css('outline-offset')) * 2
-        jQuery(@toolbar).css "width", el.width()+widthToAdd
-      else
-        @toolbar.css "width", "auto"
-      @_trigger "activated", @
-
-    turnOff: () ->
-      @toolbar.hide()
-      jQuery(@element).removeClass 'inEditMode'
-      if (@options.showAlways)
-        @element.blur()
-      @_trigger "deactivated", @
-
-      unless @getContents()
-        @setContents @options.placeholder
-
-    _activated: (event) ->
-      event.data.turnOn()
-
-    _deactivated: (event) ->
-      event.data.turnOff()
+  }
 
 
 )(jQuery)
