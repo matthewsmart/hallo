@@ -90,6 +90,7 @@
       disabled: ->
       selected: ->
       unselected: ->
+      modified: ->
       placeholder: ''
       toolbarClass: 'hallo_toolbar'
 
@@ -119,6 +120,7 @@
       'hallo:disabled'    : 'disabled'
       'hallo:selected'    : 'selected'
       'hallo:unselected'  : 'unselected'
+      'hallo:modified'    : 'modified'
 
     _bindUserCallbacks: ->
       for event, callback of @_userCallbacks
@@ -134,7 +136,7 @@
       'blur'              : '_deactivateEditMode'
       'keyup paste change': '_checkModified'
       'keyup'             : '_checkEscape'
-      'keyup mouseup'     : '_checkSelection'
+      'keyup mouseup'     : '_setSelection'
 
     # Enable an editable
     enable: ->
@@ -201,49 +203,20 @@
 
     # Only supports one range for now (i.e. no multiselection)
     getSelection: ->
-      if jQuery.browser.msie
-        range = document.selection.createRange()
-      else
-        if window.getSelection
-          userSelection = window.getSelection()
-        else if (document.selection) #opera
-          userSelection = document.selection.createRange()
-        else
-          throw "Your browser does not support selection handling"
-
-        if userSelection.rangeCount > 0
-          range = userSelection.getRangeAt(0)
-        else
-          range = userSelection
-
-      return range
+      rangy.getSelection().getRangeAt(0)
 
     restoreSelection: (range) ->
-      if ( jQuery.browser.msie )
-        range.select()
-      else
-        window.getSelection().removeAllRanges()
-        window.getSelection().addRange(range)
+      rangy.getSelection().setSingleRange(range)
 
-    replaceSelection: (cb) ->
-      if ( jQuery.browser.msie )
-        t = document.selection.createRange().text
-        r = document.selection.createRange()
-        r.pasteHTML(cb(t))
-      else
-        sel = window.getSelection()
-        range = sel.getRangeAt(0)
-        newTextNode = document.createTextNode(cb(range.extractContents()))
-        range.insertNode(newTextNode)
-        range.setStartAfter(newTextNode)
-        sel.removeAllRanges()
-        sel.addRange(range)
+    replaceSelection: (callback) ->
+      range = @getSelection()
+      newTextNode = document.createTextNode(callback(range.extractContents()))
+      range.insertNode(newTextNode)
+      range.setStartAfter(newTextNode)
+      @restoreSelection(range)
 
     removeAllSelections: () ->
-      if ( jQuery.browser.msie )
-        range.empty()
-      else
-        window.getSelection().removeAllRanges()
+      rangy.getSelection().removeAllRanges()
 
     # Get contents of an editable as HTML string
     getContents: ->
@@ -275,74 +248,49 @@
         ((1 + Math.random()) * 0x10000|0).toString(16).substring 1
       "#{S4()}#{S4()}-#{S4()}-#{S4()}-#{S4()}-#{S4()}#{S4()}#{S4()}"
 
-    _getCaretPosition: (range) ->
-      tmpSpan = jQuery "<span/>"
-      newRange = document.createRange()
-      newRange.setStart range.endContainer, range.endOffset
-      newRange.insertNode tmpSpan.get 0
+    _checkModified: (e) ->
+      e.data._checkModifiedInContext()
 
-      position = {top: tmpSpan.offset().top, left: tmpSpan.offset().left}
-      tmpSpan.remove()
-      return position
+    _checkModifiedInContext: ->
+      if @isModified()
+        @_trigger "hallo:modified", null,
+          editable: this
+          content: @getContents()
 
-
-    _checkModified: (event) ->
-      widget = event.data
-      if widget.isModified()
-        widget._trigger "modified", null,
-          editable: widget
-          content: widget.getContents()
-
-    _keys: (e) ->
+    _checkEscape: (e) ->
       if e.keyCode == 27
         e.data.restoreOriginalContent()
-        e.data.deactivateEditor()
+        e.data.element.blur()
 
     _rangesEqual: (r1, r2) ->
       r1.startContainer is r2.startContainer and r1.startOffset is r2.startOffset and r1.endContainer is r2.endContainer and r1.endOffset is r2.endOffset
 
     # Check if some text is selected, and if this selection has changed. If it changed,
     # trigger the "halloselected" event
-    _checkSelection: (event) ->
-      if event.keyCode == 27
-        return
-
-      widget = event.data
-
+    _setSelection: (e) ->
+      e.data._checkSelectionInContext(e) unless e.keyCode == 27
+    
+    _setSelectionInContext: (event) ->
       # The mouseup event triggers before the text selection is updated.
       # I did not find a better solution than setTimeout in 0 ms
-      setTimeout ()->
-        sel = widget.getSelection()
-        if widget._isEmptySelection(sel) or widget._isEmptyRange(sel)
-          if widget.selection
-            widget.selection = null
-            widget._trigger "hallo:unselected", null,
-              editable: widget
+      setTimeout =>
+        range = @getSelection()
+        if @_isEmptyRange(range)
+          if @selection
+            @selection = null
+            @_trigger "hallo:unselected", null,
+              editable: this
               originalEvent: event
-          return
-
-        if !widget.selection or not widget._rangesEqual sel, widget.selection
-          widget.selection = sel.cloneRange()
-          widget._trigger "hallo:selected", null,
-            editable: widget
-            selection: widget.selection
-            ranges: [widget.selection]
+        else if @selection or not @_rangesEqual(range, @selection)
+          @selection = range.cloneRange()
+          @_trigger "hallo:selected", null,
+            editable: this
+            selection: @selection
             originalEvent: event
       , 0
 
-    _isEmptySelection: (selection) ->
-      if selection.type is "Caret"
-        return true
-
-      return false
-
     _isEmptyRange: (range) ->
-      if range.collapsed
-        return true
-      if range.isCollapsed
-        return range.isCollapsed()
-
-      return false
+      (range.code is 1) or range.collapsed
 
   }
 
