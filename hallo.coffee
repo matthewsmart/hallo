@@ -128,7 +128,7 @@
 
     _prepareToolbar: ->
       @toolbar_class = @options.toolbarClass
-      @toolbar = $("<div class=\"#{@toolbar_class}\"></div>").hide()
+      @toolbar = $("<div class=\"#{@toolbar_class}\"><div class=\"handle\" /></div>").hide()
       $('body').append(@toolbar)
 
     _classEvents:
@@ -150,7 +150,6 @@
           @element.on event, this, @[callback]
         @bound = true
       # Show toolbar
-      console.log 'fading in toolbar'
       @toolbar.fadeIn()
       # Trigger user event
       @_trigger 'hallo:enabled'
@@ -171,7 +170,6 @@
       @_trigger "hallo:disabled"
 
     _activateEditMode: (e) ->
-      console.log e
       e.data.activateEditMode()
 
     activateEditMode: ->
@@ -258,7 +256,7 @@
         e.data.element.blur()
 
     _rangesEqual: (r1, r2) ->
-      r1.startContainer is r2.startContainer and r1.startOffset is r2.startOffset and r1.endContainer is r2.endContainer and r1.endOffset is r2.endOffset
+      r1 and r1.equals(r2)
 
     # Check if some text is selected, and if this selection has changed. If it changed,
     # trigger the "halloselected" event
