@@ -243,11 +243,6 @@
       if document.execCommand command, false, value
         @element.trigger "change"
 
-    _generateUUID: ->
-      S4 = ->
-        ((1 + Math.random()) * 0x10000|0).toString(16).substring 1
-      "#{S4()}#{S4()}-#{S4()}-#{S4()}-#{S4()}-#{S4()}#{S4()}#{S4()}"
-
     _checkModified: (e) ->
       e.data._checkModifiedInContext()
 
@@ -268,7 +263,7 @@
     # Check if some text is selected, and if this selection has changed. If it changed,
     # trigger the "halloselected" event
     _setSelection: (e) ->
-      e.data._checkSelectionInContext(e) unless e.keyCode == 27
+      e.data._setSelectionInContext(e) unless e.keyCode == 27
     
     _setSelectionInContext: (event) ->
       # The mouseup event triggers before the text selection is updated.
@@ -291,6 +286,11 @@
 
     _isEmptyRange: (range) ->
       (range.code is 1) or range.collapsed
+
+    _generateUUID: ->
+      S4 = ->
+        ((1 + Math.random()) * 0x10000|0).toString(16).substring 1
+      "#{S4()}#{S4()}-#{S4()}-#{S4()}-#{S4()}-#{S4()}#{S4()}#{S4()}"
 
   }
 
