@@ -132,9 +132,10 @@
         hide().
         draggable().
         position
-          my: 'center'
-          at: 'right center'
+          my: 'right bottom'
+          at: 'right top'
           of: @element
+        window.toolbar = @toolbar
 
     _classEvents:
       'focus click'       : '_activateEditMode'
@@ -247,9 +248,6 @@
 
     # Execute a contentEditable command
     execute: (command, value) ->
-      console.log command
-      console.log value
-
       if document.execCommand command, false, value
         @element.trigger "change"
 
