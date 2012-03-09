@@ -3,39 +3,39 @@
 #     Hallo may be freely distributed under the MIT license
 ((jQuery) ->
     jQuery.widget "IKS.halloformat",
-        options:
-            editable: null
-            toolbar: null
-            uuid: ""
-            formattings:
-                bold: true
-                italic: true
-                strikeThrough: true
-                underline: true
+      options:
+        editable: null
+        toolbar: null
+        uuid: ""
+        formattings:
+          bold: true
+          italic: true
+          strikeThrough: true
+          underline: true
 
-        _create: ->
-          @buttonset = $("<span class=\"#{@widgetName}\"></span>")
-            
-          for format, enabled of @options.formattings
-            @_createButton(format) if enabled
+      _create: ->
+        @buttonset = $("<span class=\"#{@widgetName}\"></span>")
+          
+        for command, enabled of @options.formattings
+          label = command.substr(0, 1).toUpperCase()
+          @_createButton(command, label) if enabled
+        
+        @_createButton('removeFormat', '--')
 
-          @buttonset.buttonset()
-          @options.toolbar.append @buttonset
+        @buttonset.buttonset()
+        @options.toolbar.append @buttonset
 
-        _init: ->
+      _init: ->
 
-        _createButton: (format) ->
-          label = format.substr(0, 1).toUpperCase()
-          id = "#{@options.uuid}-#{format}"
-          @buttonset.append $("<input id=\"#{id}\" type=\"button\" value=\"#{label}\"/>").button()
-          button = $("##{id}", @buttonset)
-          button.data "hallo-command", format
-          button.on "click", (e) =>
-            console.log e
-            command = $(e.currentTarget).data "hallo-command"
-            @options.editable.execute command
-            e.preventDefault()
-            return false
-
+      _createButton: (command, label) ->
+        id = "#{@options.uuid}-#{command}"
+        @buttonset.append $("<input id=\"#{id}\" type=\"button\" value=\"#{label}\"/>").button()
+        button = $("##{id}", @buttonset)
+        button.data "hallo-command", command
+        button.on "click", (e) =>
+          command = $(e.currentTarget).data "hallo-command"
+          @options.editable.execute command, false
+          e.preventDefault()
+          return false
 
 )(jQuery)
