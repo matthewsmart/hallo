@@ -28,21 +28,26 @@
       @options.toolbar.append @buttonset
 
     _prepareDialogElement: ->
-      selectable = $('<ul />').addClass 'image_list'
+      @result = $('<input type="hidden" />')
+      @list = @_prepareImageList()
+      $('<div />').attr(id: "#{@options.uuid}-dialog").
+        append(@list).
+        append(@result)
+      
+      @list.selectable stop: =>
+        @_storeResult()
+
+    _storeResult: ->
+      @result.val $('.ui-selected', selectable).data('url')
+
+    _prepareImageList: ->
+      list = $('<ul />').addClass 'image_list'
       for image in @options.image_list
         $('<li />').append("<img src=\"#{image.thumb}\" />").
           data(url: image.url).
           css(float: 'left').
-          appendTo(selectable)
-          
-      dialog_id = "#{@options.uuid}-dialog"
-      @result = $('<input type="hidden" />')
-      selectable.selectable stop: (event, ui) =>
-        @result.val $('.ui-selected', selectable).data('url')
-        console.log @result
-      $('<div />').attr(id: dialog_id).
-        append(selectable).
-        append(@result)
+          appendTo(list)
+      list
 
     _insertImage: ->
       @options.editable.restoreSelection(@selection)
